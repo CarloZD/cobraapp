@@ -8,46 +8,44 @@ from datetime import datetime
 
 app = FastAPI()
 
-def identificar_banco(texto):
-    texto_upper = texto.upper()
-    if "YAPE" in texto_upper: return "Yape"
-    if "PLIN" in texto_upper: return "Plin"
-    if "BCP" in texto_upper or "CREDITO" in texto_upper: return "BCP"
-    if "INTERBANK" in texto_upper: return "Interbank"
-    if "BBVA" in texto_upper: return "BBVA"
-    if "SCOTIABANK" in texto_upper: return "Scotiabank"
-    return "Banco Externo"
-
 def extraer_datos(texto):
-    banco = identificar_banco(texto)
+    # Identificación de Banco
+    texto_upper = texto.upper()
+    banco = "Otro Banco"
+    if "YAPE" in texto_upper: banco = "Yape"
+    elif "PLIN" in texto_upper: banco = "Plin"
+    elif any(x in texto_upper for x in ["BCP", "CREDITO"]): banco = "BCP"
+    elif "INTERBANK" in texto_upper: banco = "Interbank"
+
+    # 1. Monto: Busca patrones como S/ 10, S/. 10.00, s/10
+    monto_match = re.search(r'(?:S/|s/|S\.)\s?(\d+(?:\.\d{2})?)', texto, re.IGNORECASE)
     
-    # 1. Monto: Busca patrones de moneda S/ seguido de números
-    monto_match = re.search(r'(?:S/|s/|S\.|s\.)?\s?(\d{1,4}(?:\.\d{2})?)', texto)
+    # 2. Operación: Busca números de 6 a 15 dígitos
+    operacion_match = re.search(r'(?:operaci[oó]n|nro|n[uú]mero|ref|id|transacci[oó]n)[:.\s]*(\d{6,15})', texto, re.IGNORECASE)
     
-    # 2. Operación: Busca números largos de 6 a 14 dígitos (BCP e Interbank usan formatos largos)
-    operacion_match = re.search(r'(?:operaci[oó]n|nro|n[uú]mero|ref|constancia|transacci[oó]n)[:.\s]*(\d{6,14})', texto, re.IGNORECASE)
-    
-    # 3. Fecha y Hora: Formato flexible para capturar "14 Abr 2026" o "14/04/2026"
+    # 3. Fecha y Hora: Formato flexible
     fecha_match = re.search(r'(\d{1,2}\s+[a-z]{3}\.?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})', texto, re.IGNORECASE)
     hora_match = re.search(r'(\d{1,2}:\d{2}\s*(?:a\.\s*m\.|p\.\s*m\.|am|pm))', texto, re.IGNORECASE)
 
-    # 4. Extracción de Nombre según el Banco
-    nombre_final = "Voucher Detectado"
+    # 4. Extracción de Nombre (Lógica mejorada)
+    nombre_final = "No detectado"
     lineas = [l.strip() for l in texto.split('\n') if len(l.strip()) > 2]
 
-    if banco == "Yape":
-        # Lógica específica para el diseño de Yape
-        nombre_match = re.search(r'(?:S/|s/|S\.)\s?\d+(?:\.\d{2})?\s*\n+(.*?)\n', texto, re.IGNORECASE)
-        if nombre_match: nombre_final = nombre_match.group(1).strip()
-    elif banco == "BCP":
-        # En BCP suele estar después de "Enviado a" o "Destinatario"
-        nombre_match = re.search(r'(?:Enviado a|Destinatario|Para)[:\s]+(.*?)(?:\n|$)', texto, re.IGNORECASE)
-        if nombre_match: nombre_final = nombre_match.group(1).strip()
-    else:
-        # Lógica general para otros bancos: busca la línea más larga que no tenga números
+    # Intentar por etiquetas comunes
+    nombre_match = re.search(r'(?:Destinatario|Para|Enviado a|Pagado a|Nombre)[:\s]+(.*?)(?:\n|$)', texto, re.IGNORECASE)
+    
+    if nombre_match and not any(x in nombre_match.group(1).upper() for x in ["EXITOSO", "PAGO", "S/."]):
+        nombre_final = nombre_match.group(1).strip()
+    elif banco == "Yape":
+        # En Yape el nombre suele estar 2 líneas después de "Yapeaste" o justo después del monto
+        res_yape = re.search(r'(?:S/|s/|S\.)\s?\d+(?:\.\d{2})?\s*\n+(.*?)\n', texto, re.IGNORECASE)
+        if res_yape: nombre_final = res_yape.group(1).strip()
+    
+    # Limpieza final: si el nombre detectado es muy corto o tiene números, se busca en las líneas
+    if nombre_final == "No detectado" or len(nombre_final) < 4:
         for linea in lineas:
-            if re.search(r'[a-zA-Z]{6,}', linea) and not re.search(r'S/|s/|\d{4}', linea):
-                if not any(x in linea.upper() for x in ["OPERACIÓN", "CONSTANCIA", "EXITOSA", "TRANSFERENCIA"]):
+            if re.search(r'[a-zA-Z]{5,}', linea) and not re.search(r'S/|s/|\d{4}', linea):
+                if not any(x in linea.upper() for x in ["OPERACIÓN", "CONSTANCIA", "EXITO", "TRANSACC", "PAGO", "YAPEASTE"]):
                     nombre_final = linea
                     break
 
@@ -68,9 +66,12 @@ async def procesar_pago(file: UploadFile = File(...)):
         contents = await file.read()
         nparr = np.frombuffer(contents, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None: return {"estado": "error", "detalle": "No se pudo decodificar la imagen"}
 
-        # Pre-procesamiento para limpiar ruidos de fondo (especial para vouchers verdes/azules)
+        # 1. Reescalado: Crucial para imágenes de Telegram/WhatsApp
+        h, w = img.shape[:2]
+        img = cv2.resize(img, (w*2, h*2), interpolation=cv2.INTER_CUBIC)
+
+        # 2. Procesamiento Simple (Grises + Otsu) para no perder texto blanco
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
