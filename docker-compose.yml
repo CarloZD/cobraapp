@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  # Servicio de la API de Python (FastAPI + Tesseract)
+  python-api:
+    build: ./python-api
+    container_name: python_ocr_api
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./pagos:/app/pagos
+    networks:
+      - cobraapp_network
+
+  # Servicio de n8n
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n_worker
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_USER_MANAGEMENT_ADMIN_EMAIL=admin@admin.com
+      - N8N_USER_MANAGEMENT_ADMIN_PASSWORD=admin123
+      - N8N_USER_MANAGEMENT_ADMIN_FIRST_NAME=Carlos
+      - N8N_USER_MANAGEMENT_ADMIN_LAST_NAME=Admin
+      - WEBHOOK_URL=https://wreath-foil-stylized.ngrok-free.dev
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - cobraapp_network
+    depends_on:
+      - python-api
+
+networks:
+  cobraapp_network:
+    driver: bridge
+
+volumes:
+  n8n_data:
