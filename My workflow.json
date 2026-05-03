@@ -1,0 +1,284 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cec81a88-5685-4531-af0e-23578c554d46",
+      "name": "Telegram Trigger",
+      "webhookId": "0ef64ffc-3a8c-4cc6-9073-00563f0cbc58",
+      "credentials": {
+        "telegramApi": {
+          "id": "D0ojbIACaoShjRoB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d7a1d842-52ee-4a29-9551-c630e247eed9",
+              "leftValue": "={{ $json.message.photo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        -112
+      ],
+      "id": "b873afa0-eb9f-48d2-9319-043d94b2da43",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.photo.reverse()[0].file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        512,
+        -208
+      ],
+      "id": "88e75c84-aa84-4586-9772-4ff7a39e6921",
+      "name": "Get a file",
+      "webhookId": "1f48b626-9e1b-4d13-aae7-82559573a611",
+      "credentials": {
+        "telegramApi": {
+          "id": "D0ojbIACaoShjRoB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://python_ocr_api:8000/procesar-pago",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        -208
+      ],
+      "id": "57ce49b5-51c9-490d-a164-cafca3e23464",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BdAFT3mC0_2Fdmv3HUSzQZazNJptzCOVj2OP6Ki_rs0",
+          "mode": "list",
+          "cachedResultName": "Registro de Pagos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BdAFT3mC0_2Fdmv3HUSzQZazNJptzCOVj2OP6Ki_rs0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BdAFT3mC0_2Fdmv3HUSzQZazNJptzCOVj2OP6Ki_rs0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Estado": "={{ $json.estado }}",
+            "Banco": "={{ $json.banco }}",
+            "Nombre": "={{ $json.nombre }}",
+            "Operacion": "={{ $json.operacion }}",
+            "Monto": "={{ $json.monto }}",
+            "Fecha_Voucher ": "={{ $json.fecha_voucher }}",
+            "Fecha Proceso": "={{ $json.fecha_proceso }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Banco",
+              "displayName": "Banco",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Monto",
+              "displayName": "Monto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Operacion",
+              "displayName": "Operacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha_Voucher ",
+              "displayName": "Fecha_Voucher ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha Proceso",
+              "displayName": "Fecha Proceso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        928,
+        -208
+      ],
+      "id": "f4b06c13-e771-4727-aba5-92b17a5821b8",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zO38T5cW6PL76qHY",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bfd5d2cc-7f82-47d3-8ea4-c4beaae4bf51",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a5a9f447faee94f785334272d4462c79c75a48450d52900c5713459e3fcf2087"
+  },
+  "id": "zSUuOeikjmsfDxFK",
+  "tags": []
+}
