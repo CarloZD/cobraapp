@@ -1,42 +1,40 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  # Servicio de la API de Python (FastAPI + Tesseract)
-  python-api:
+  # Servicio 1: La API de Python (OCR)
+  python_ocr_api:
     build: ./python-api
     container_name: python_ocr_api
     restart: always
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./pagos:/app/pagos
-    networks:
-      - cobraapp_network
+    # No necesita puertos hacia afuera porque n8n le habla por la red interna
 
-  # Servicio de n8n
+  # Servicio 2: n8n
   n8n:
-    image: n8nio/n8n
-    container_name: n8n_worker
+    image: n8nio/n8n:latest
+    container_name: n8n_ocr
     restart: always
     ports:
       - "5678:5678"
     environment:
-      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-      - N8N_USER_MANAGEMENT_ADMIN_EMAIL=admin@admin.com
-      - N8N_USER_MANAGEMENT_ADMIN_PASSWORD=admin123
-      - N8N_USER_MANAGEMENT_ADMIN_FIRST_NAME=Carlos
-      - N8N_USER_MANAGEMENT_ADMIN_LAST_NAME=Admin
-      - WEBHOOK_URL=https://wreath-foil-stylized.ngrok-free.dev
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=${WEBHOOK_URL} # Lee la URL completa del .env
+      - N8N_PORT=5678
     volumes:
-      - n8n_data:/home/node/.n8n
-    networks:
-      - cobraapp_network
-    depends_on:
-      - python-api
+      - ./n8n_data:/home/node/.local/share/n8n
 
-networks:
-  cobraapp_network:
-    driver: bridge
+  # Servicio 3: Ngrok (El túnel)
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok_tunnel
+    restart: always
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "n8n:5678"
+      - "--domain=${NGROK_DOMAIN}" # Usa tu dominio fijo de Ngrok
+    depends_on:
+      - n8n
 
 volumes:
   n8n_data:
